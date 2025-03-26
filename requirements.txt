@@ -1,8 +1,7 @@
-deepface
-opencv-python
-easyocr
-pytesseract
-tesseract
 streamlit
 opencv-python-headless
-
+numpy
+deepface
+pillow
+tensorflow
+tf-keras
