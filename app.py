@@ -12,9 +12,7 @@ st.set_page_config(page_title="XenFace - Document Verification", page_icon="🔍
 st.markdown("""
     <style>
         .big-font {font-size:20px !important; font-weight: bold; color: #4CAF50;}
-        .stButton>button {background-color: #4CAF50; color: white; border-radius: 8px; border: none; padding: 12px; width: 100%;}
-        .stSpinner {color: #4CAF50 !important;}
-        .sidebar .sidebar-content {position: fixed; width: 300px;}
+        .stButton>button {background-color: #4CAF50; color: white; border-radius: 8px; padding: 12px; width: 100%;}
         .stFileUploader>label {font-size: 16px !important; font-weight: bold;}
         .stFileUploader div {max-width: 90%;} /* Reduce upload field size */
     </style>
@@ -84,11 +82,8 @@ def resize_image(image_path, output_name="resized.jpg"):
 # ===================== 📌 FUNCTION: Verify Faces =====================
 def verify_faces(img1_path, img2_path, model_name="ArcFace", detector_backend="mtcnn", threshold=0.66):
     try:
-        img1_path = resize_image(img1_path, "resized_profile.jpg")
-        img2_path = resize_image(img2_path, "resized_cnic.jpg")
         result = DeepFace.verify(img1_path, img2_path, model_name=model_name, detector_backend=detector_backend)
         result["verified"] = result["distance"] <= threshold
-        result["threshold"] = threshold
         return result, None
     except Exception as e:
         return None, f"❌ Error during verification: {str(e)}"
@@ -97,20 +92,11 @@ def verify_faces(img1_path, img2_path, model_name="ArcFace", detector_backend="m
 st.title("🔍 XenFace - Document Verification System")
 st.write("Upload your **CNIC image** and **profile picture** to verify identity.")
 
-# 📌 Sidebar (Fixed and Fully Visible)
 st.sidebar.header("Settings")
 model_choice = st.sidebar.selectbox("Select Face Recognition Model", ["ArcFace", "VGG-Face", "Facenet"])
 enable_watermark = st.sidebar.checkbox("Enable Watermarking", value=True)
 enable_blur = st.sidebar.checkbox("Blur CNIC Text Details", value=True)
 enable_face_crop = st.sidebar.checkbox("Enable Face Cropping", value=True)
-
-st.sidebar.subheader("ℹ️ How It Works?")
-st.sidebar.write("""
-1️⃣ Upload your **CNIC Image** & **Profile Picture**  
-2️⃣ The system extracts & enhances your face  
-3️⃣ CNIC text can be blurred, and watermark added  
-4️⃣ Your identity is verified with AI-powered face matching  
-""")
 
 # 📌 File Uploaders
 col1, col2 = st.columns(2)
@@ -125,41 +111,49 @@ if cnic_file and profile_file:
     with open(profile_path, "wb") as f: f.write(profile_file.getbuffer())
 
     with st.spinner("Processing images..."):
+        # Process profile image
         if enable_face_crop:
             profile_path, profile_error = extract_single_face(profile_path, "profile_face.jpg")
-            cnic_path, cnic_error = extract_single_face(cnic_path, "cnic_face.jpg")
-
             if profile_error:
                 st.error(profile_error)
+                profile_path = None
+
+        # Process CNIC image
+        if enable_face_crop:
+            cnic_path, cnic_error = extract_single_face(cnic_path, "cnic_face.jpg")
             if cnic_error:
                 st.error(cnic_error)
+                cnic_path = None
 
-        if enable_blur:
+        if enable_blur and cnic_path:
             cnic_path, _ = blur_cnic_text(cnic_path, "blurred_cnic.jpg")
 
-        if enable_watermark:
+        if enable_watermark and cnic_path:
             cnic_path = add_watermark(cnic_path, "watermarked_cnic.jpg")
 
-        resized_cnic_path = resize_image(cnic_path, "resized_cnic.jpg")
-        resized_profile_path = resize_image(profile_path, "resized_profile.jpg")
-        time.sleep(1)
+        # Ensure both images are valid before resizing
+        resized_profile_path = resize_image(profile_path, "resized_profile.jpg") if profile_path else None
+        resized_cnic_path = resize_image(cnic_path, "resized_cnic.jpg") if cnic_path else None
 
-    st.subheader("📷 Processed Face Images")
-    col1, col2 = st.columns(2)
-    with col1:
-        st.image(resized_profile_path, caption="Profile Picture", use_container_width=True)
-    with col2:
-        st.image(resized_cnic_path, caption="Processed CNIC Image", use_container_width=True)
+    # Display processed images
+    if resized_profile_path and resized_cnic_path:
+        col1, col2 = st.columns(2)
+        with col1:
+            st.image(resized_profile_path, caption="Profile Picture", use_container_width=True)
+        with col2:
+            st.image(resized_cnic_path, caption="Processed CNIC Image", use_container_width=True)
 
-    if st.button("🔍 Start Verification"):
-        with st.spinner("Verifying faces..."):
-            result, verify_error = verify_faces(resized_profile_path, resized_cnic_path, model_choice)
-            time.sleep(2)
+        if st.button("🔍 Start Verification"):
+            with st.spinner("Verifying faces..."):
+                result, verify_error = verify_faces(resized_profile_path, resized_cnic_path, model_choice)
+                time.sleep(2)
 
-        if verify_error:
-            st.error(verify_error)
-        else:
-            st.subheader("✅ Verification Result")
-            st.markdown(f"### {'✅ Identity Verified!' if result['verified'] else '⚠️ Identity Mismatch!'}")
+            if verify_error:
+                st.error(verify_error)
+            else:
+                st.subheader("✅ Verification Result")
+                st.markdown(f"### {'✅ Identity Verified!' if result['verified'] else '⚠️ Identity Mismatch!'}")
+    else:
+        st.warning("⚠️ Verification skipped due to image errors.")
 else:
     st.warning("⚠️ Please upload both images to proceed!")
