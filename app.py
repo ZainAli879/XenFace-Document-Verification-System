@@ -89,42 +89,48 @@ with col2:
     profile_file = st.file_uploader("📄 Upload Profile Image", type=["jpg", "png", "jpeg"])
 
 if cnic_file and profile_file:
-    cnic_path, profile_path = "uploaded_cnic.jpg", "uploaded_profile.jpg"
-    with open(cnic_path, "wb") as f: f.write(cnic_file.getbuffer())
-    with open(profile_path, "wb") as f: f.write(profile_file.getbuffer())
+    # Check file sizes before processing
+    if cnic_file.size > 3 * 1024 * 1024 or profile_file.size > 3 * 1024 * 1024:  # 3MB limit
+        st.error("❌ Image size too large! Please upload images smaller than 3MB.")
+    else:
+        cnic_path, profile_path = "uploaded_cnic.jpg", "uploaded_profile.jpg"
+        with open(cnic_path, "wb") as f: f.write(cnic_file.getbuffer())
+        with open(profile_path, "wb") as f: f.write(profile_file.getbuffer())
 
-    with st.spinner("Processing images..."):
-        profile_path, profile_error = extract_face(profile_path, "profile_face.jpg")
-        if profile_error:
-            st.error(profile_error)
+        with st.spinner("Processing images..."):
+            # Extract face from profile image
+            profile_path, profile_error = extract_face(profile_path, "profile_face.jpg")
+            if profile_error:
+                st.error(profile_error)
+            else:
+                # Extract face from CNIC if enabled
+                if enable_cnic_crop:
+                    cnic_path, cnic_error = extract_face(cnic_path, "cnic_face.jpg")
+                    if cnic_error:
+                        st.error(cnic_error)
+                    else:
+                        if enable_cnic_blur:
+                            cnic_path, _ = blur_cnic_text(cnic_path, "blurred_cnic.jpg")
 
-        if enable_cnic_crop:
-            cnic_path, cnic_error = extract_face(cnic_path, "cnic_face.jpg")
-            if cnic_error:
-                st.error(cnic_error)
-        
-        if enable_cnic_blur:
-            cnic_path, _ = blur_cnic_text(cnic_path, "blurred_cnic.jpg")
-        
-    st.subheader("📷 Processed Face Images")
-    col1, col2 = st.columns(2)
-    with col1:
-        st.image(profile_path, caption="Profile Picture", use_container_width=True)
-    with col2:
-        st.image(cnic_path, caption="Processed CNIC Image", use_container_width=True)
+                # Show processed images only if no errors occurred
+                st.subheader("📷 Processed Face Images")
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.image(profile_path, caption="Profile Picture", use_container_width=True)
+                with col2:
+                    st.image(cnic_path, caption="Processed CNIC Image", use_container_width=True)
 
-    if st.button("🔍 Start Verification"):
-        with st.spinner("Verifying faces..."):
-            result, verify_error = verify_faces(profile_path, cnic_path)
-            time.sleep(2)
+                # Face Verification
+                if st.button("🔍 Start Verification"):
+                    with st.spinner("Verifying faces..."):
+                        result, verify_error = verify_faces(profile_path, cnic_path)
+                        time.sleep(2)
 
-        if verify_error:
-            st.error(verify_error)
-        else:
-            st.subheader("✅ Verification Result")
-            st.markdown(f"### {'✅ Identity Verified!' if result['verified'] else '⚠️ Identity Mismatch!'}")
-            st.write(f"**Distance Score:** {result['distance']:.4f}")
-            st.write(f"**Threshold:** {result['threshold']:.2f}")
-            st.write(f"**Similarity Score:** {result['similarity_score']:.2f}")
-else:
-    st.warning("⚠️ Please upload both images to proceed!")
+                    if verify_error:
+                        st.error(verify_error)
+                    else:
+                        st.subheader("✅ Verification Result")
+                        st.markdown(f"### {'✅ Identity Verified!' if result['verified'] else '⚠️ Identity Mismatch!'}")
+                        st.write(f"**Distance Score:** {result['distance']:.4f}")
+                        st.write(f"**Threshold:** {result['threshold']:.2f}")
+                        st.write(f"**Similarity Score:** {result['similarity_score']:.2f}")
