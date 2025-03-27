@@ -5,4 +5,4 @@ deepface
 pillow
 tensorflow
 tf-keras
-tesseract-ocr
+easyocr
