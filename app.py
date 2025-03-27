@@ -1,10 +1,23 @@
-#app.py
 import streamlit as st
 import cv2
 import numpy as np
 import os
+import easyocr
+import re
 from deepface import DeepFace
 from PIL import Image
+
+# ===================== 📌 CNIC NUMBER VALIDATION (OCR) =====================
+def extract_cnic_number(image_path):
+    reader = easyocr.Reader(['en'])
+    result = reader.readtext(image_path)
+    
+    for detection in result:
+        text = detection[1]
+        if re.match(r"^\d{5}-\d{7}-\d$", text):
+            return text, None
+
+    return None, "❌ CNIC number not detected or incorrect format!"
 
 # ===================== 📌 FACE EXTRACTION FUNCTION =====================
 def extract_face(image_path, output_name="cropped_face.jpg"):
@@ -21,19 +34,13 @@ def extract_face(image_path, output_name="cropped_face.jpg"):
     if len(faces) == 0:
         return None, "⚠️ No face detected! Please upload a clear image with your face."
     elif len(faces) > 1:
-        # Draw bounding boxes around detected faces
-        for (x, y, w, h) in faces:
-            cv2.rectangle(img, (x, y), (x + w, y + h), (0, 0, 255), 2)
         cv2.imwrite("multiple_faces_detected.jpg", img)
         return None, "⚠️ Multiple faces detected! Please upload an image with only your face."
 
-    # Extract the first detected face
     x, y, w, h = faces[0]
     face = img[y:y+h, x:x+w]
-
-    cropped_face_path = output_name
-    cv2.imwrite(cropped_face_path, face)
-    return cropped_face_path, None
+    cv2.imwrite(output_name, face)
+    return output_name, None
 
 # ===================== 📌 CNIC IMAGE ENHANCEMENT FUNCTION =====================
 def enhance_cnic_image(image_path, output_name="enhanced_cnic.jpg"):
@@ -52,7 +59,7 @@ def enhance_cnic_image(image_path, output_name="enhanced_cnic.jpg"):
 # ===================== 📌 IMAGE RESIZING FUNCTION (FOR DeepFace) =====================
 def resize_image(image_path, output_name="resized.jpg"):
     img = Image.open(image_path)
-    img = img.resize((250, 250))  # Resize to 250x250 for better DeepFace processing
+    img = img.resize((250, 250))
     img.save(output_name)
     return output_name
 
@@ -60,16 +67,12 @@ def resize_image(image_path, output_name="resized.jpg"):
 def verify_faces(img1_path, img2_path, model_name="ArcFace", detector_backend="mtcnn", threshold=0.66):
     try:
         if not os.path.exists(img1_path) or not os.path.exists(img2_path):
-            return None, "⚠️ One or both processed images are missing. Verification cannot proceed."
+            return None, "⚠️ One or both processed images are missing."
 
-        # Resize images before verification
         img1_path = resize_image(img1_path, "resized_profile.jpg")
         img2_path = resize_image(img2_path, "resized_cnic.jpg")
 
-        # Perform DeepFace verification
         result = DeepFace.verify(img1_path, img2_path, model_name=model_name, detector_backend=detector_backend)
-
-        # Apply custom threshold
         result["verified"] = result["distance"] <= threshold
         result["threshold"] = threshold
 
@@ -89,7 +92,6 @@ with col2:
     profile_file = st.file_uploader("📤 Upload Profile Image", type=["jpg", "png", "jpeg"])
 
 if cnic_file and profile_file:
-    # Save uploaded images
     cnic_path = "uploaded_cnic.jpg"
     profile_path = "uploaded_profile.jpg"
 
@@ -99,26 +101,28 @@ if cnic_file and profile_file:
     with open(profile_path, "wb") as f:
         f.write(profile_file.getbuffer())
 
+    # Extract CNIC number using OCR
+    cnic_number, cnic_number_error = extract_cnic_number(cnic_path)
+
+    if cnic_number_error:
+        st.error(cnic_number_error)
+    else:
+        st.success(f"✅ Detected CNIC Number: **{cnic_number}**")
+
     # Extract Faces from CNIC & Profile Images
     cnic_face_path, cnic_error = extract_face(cnic_path, "cnic_face.jpg")
     profile_face_path, profile_error = extract_face(profile_path, "profile_face.jpg")
 
     if cnic_error:
         st.error(cnic_error)
-        if "Multiple faces detected" in cnic_error:
-            st.image("multiple_faces_detected.jpg", caption="Detected Multiple Faces", use_column_width=True)
     elif profile_error:
         st.error(profile_error)
-        if "Multiple faces detected" in profile_error:
-            st.image("multiple_faces_detected.jpg", caption="Detected Multiple Faces", use_column_width=True)
     else:
-        # Enhance CNIC image ONLY (Not the Profile Image)
         enhanced_cnic_path, cnic_enhance_error = enhance_cnic_image(cnic_face_path, "enhanced_cnic.jpg")
 
         if cnic_enhance_error:
             st.error(cnic_enhance_error)
         else:
-            # Show processed faces
             st.subheader("📷 Processed Face Images")
             col1, col2 = st.columns(2)
 
@@ -133,7 +137,6 @@ if cnic_file and profile_file:
             if verify_error:
                 st.error(verify_error)
             else:
-                # Display Result
                 st.subheader("✅ Verification Result")
                 distance = result["distance"]
                 threshold = result["threshold"]
