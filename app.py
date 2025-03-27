@@ -58,7 +58,7 @@ def blur_cnic_text(image_path, output_name="blurred_cnic.jpg"):
     
     for cnt in contours:
         x, y, w, h = cv2.boundingRect(cnt)
-        if np.mean(mask[y:y+h, x:x+w]) == 0:  # Ensure it's not the face region
+        if np.mean(mask[y:y+h, x:x+w]) == 0 and w > 50 and h > 10:  # Ensure it's not the face region and large enough to be text
             img[y:y+h, x:x+w] = cv2.GaussianBlur(img[y:y+h, x:x+w], (15, 15), 10)
     
     cv2.imwrite(output_name, img)
@@ -106,22 +106,26 @@ if cnic_file and profile_file:
         profile_path, profile_error = extract_and_enhance_face(profile_path, "profile_face.jpg")
         if profile_error:
             st.error(profile_error)
-
+        
         if enable_cnic_crop:
             cnic_path, cnic_error = extract_and_enhance_face(cnic_path, "cnic_face.jpg")
             if cnic_error:
                 st.error(cnic_error)
         
         if enable_cnic_blur:
-            cnic_path, _ = blur_cnic_text(cnic_path, "blurred_cnic.jpg")
+            cnic_blurred, _ = blur_cnic_text(cnic_path, "blurred_cnic.jpg")
+            if cnic_blurred:
+                cnic_path = cnic_blurred
         
     st.subheader("📷 Processed Face Images")
     col1, col2 = st.columns(2)
-    with col1:
-        st.image(profile_path, caption="Enhanced Profile Picture", use_container_width=True)
-    with col2:
-        st.image(cnic_path, caption="Processed CNIC Image", use_container_width=True)
-
+    if profile_path:
+        with col1:
+            st.image(profile_path, caption="Enhanced Profile Picture", use_container_width=True)
+    if cnic_path:
+        with col2:
+            st.image(cnic_path, caption="Processed CNIC Image", use_container_width=True)
+    
     if st.button("🔍 Start Verification"):
         with st.spinner("Verifying faces..."):
             result, verify_error = verify_faces(profile_path, cnic_path)
