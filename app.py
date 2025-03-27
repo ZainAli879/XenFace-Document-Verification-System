@@ -14,7 +14,7 @@ st.markdown("""
         .big-font {font-size:20px !important; font-weight: bold; color: #4CAF50;}
         .stButton>button {background-color: #4CAF50; color: white; border-radius: 8px; border: none; padding: 12px; width: 100%;}
         .stSpinner {color: #4CAF50 !important;}
-        .sidebar .sidebar-content {position: fixed; width: 300px;}
+        .stSidebar {background-color: #F0F2F6; padding: 20px; width: 280px; position: fixed;}
         .stFileUploader>label {font-size: 16px !important; font-weight: bold;}
         .stFileUploader div {max-width: 90%;} /* Reduce upload field size */
     </style>
@@ -50,24 +50,6 @@ def enhance_image(image_path, output_name="enhanced.jpg"):
     img.save(output_name)
     return output_name
 
-# ===================== 📌 FUNCTION: Add Watermark =====================
-def add_watermark(image_path, output_name="watermarked_cnic.jpg", text="XenFace Secure"):
-    img = Image.open(image_path).convert("RGBA")
-    watermark = Image.new("RGBA", img.size, (255, 255, 255, 0))
-    draw = ImageDraw.Draw(watermark)
-    font = ImageFont.load_default()
-    text_position = (10, img.size[1] - 30)
-    draw.text(text_position, text, fill=(255, 255, 255, 128), font=font)
-    img = Image.alpha_composite(img, watermark)
-    img.convert("RGB").save(output_name)
-    return output_name
-
-# ===================== 📌 FUNCTION: Resize Image =====================
-def resize_image(image_path, output_name="resized.jpg"):
-    img = Image.open(image_path).resize((250, 250))
-    img.save(output_name)
-    return output_name
-
 # ===================== 📌 FUNCTION: Verify Faces =====================
 def verify_faces(img1_path, img2_path, model_name="ArcFace", detector_backend="mtcnn", threshold=0.66):
     try:
@@ -82,8 +64,8 @@ def verify_faces(img1_path, img2_path, model_name="ArcFace", detector_backend="m
 st.title("🔍 XenFace - Document Verification System")
 st.write("Upload your **CNIC image** and **profile picture** to verify identity.")
 
-# 📌 Sidebar (Fixed and Fully Visible)
-st.sidebar.header("Settings")
+# 📌 Sidebar (Styled and Fixed)
+st.sidebar.header("⚙️ Settings")
 enable_cnic_crop = st.sidebar.checkbox("Enable CNIC Face Cropping", value=False)
 
 # 📌 File Uploaders
