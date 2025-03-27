@@ -46,19 +46,19 @@ def blur_cnic_text(image_path, output_name="blurred_cnic.jpg"):
         return None, "❌ Error: CNIC Image not found!"
     
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    _, thresh = cv2.threshold(gray, 120, 255, cv2.THRESH_BINARY_INV)
-    contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-    
     face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
     faces = face_cascade.detectMultiScale(gray, 1.3, 5)
-    face_mask = np.zeros_like(gray)
     
+    mask = np.zeros_like(gray)
     for (x, y, w, h) in faces:
-        face_mask[y:y+h, x:x+w] = 255  # Mark face area
+        mask[y:y+h, x:x+w] = 255  # Mark face area to exclude from blurring
+    
+    edged = cv2.Canny(gray, 30, 150)
+    contours, _ = cv2.findContours(edged, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     
     for cnt in contours:
         x, y, w, h = cv2.boundingRect(cnt)
-        if w > 50 and h > 10 and np.mean(face_mask[y:y+h, x:x+w]) == 0:  # Ensure it's not in the face region
+        if np.mean(mask[y:y+h, x:x+w]) == 0:  # Ensure it's not the face region
             img[y:y+h, x:x+w] = cv2.GaussianBlur(img[y:y+h, x:x+w], (15, 15), 10)
     
     cv2.imwrite(output_name, img)
