@@ -4,13 +4,13 @@ import numpy as np
 import os
 import time
 from deepface import DeepFace
-from PIL import Image, ImageEnhance
+from PIL import Image
 
 # ===================== 📌 CONFIGURE STREAMLIT THEME =====================
 st.set_page_config(page_title="XenFace - Document Verification", page_icon="🔍", layout="wide")
 
-# ===================== 📌 FUNCTION: Extract & Enhance Face =====================
-def extract_and_enhance_face(image_path, output_name="enhanced_face.jpg"):
+# ===================== 📌 FUNCTION: Extract Face =====================
+def extract_face(image_path, output_name="face.jpg"):
     img = cv2.imread(image_path)
     if img is None:
         return None, "❌ Error: Image not found!"
@@ -26,18 +26,8 @@ def extract_and_enhance_face(image_path, output_name="enhanced_face.jpg"):
 
     x, y, w, h = faces[0]
     face = img[y:y+h, x:x+w]
-    enhanced_face = enhance_image_quality(face)
-    cv2.imwrite(output_name, enhanced_face)
+    cv2.imwrite(output_name, face)
     return output_name, None
-
-# ===================== 📌 FUNCTION: Enhance Image Quality =====================
-def enhance_image_quality(img):
-    pil_img = Image.fromarray(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
-    enhancer = ImageEnhance.Sharpness(pil_img)
-    enhanced_img = enhancer.enhance(2.0)  # Enhance sharpness
-    enhancer = ImageEnhance.Contrast(enhanced_img)
-    enhanced_img = enhancer.enhance(1.5)  # Enhance contrast
-    return cv2.cvtColor(np.array(enhanced_img), cv2.COLOR_RGB2BGR)
 
 # ===================== 📌 FUNCTION: Blur CNIC Text =====================
 def blur_cnic_text(image_path, output_name="blurred_cnic.jpg"):
@@ -58,7 +48,7 @@ def blur_cnic_text(image_path, output_name="blurred_cnic.jpg"):
     
     for cnt in contours:
         x, y, w, h = cv2.boundingRect(cnt)
-        if np.mean(mask[y:y+h, x:x+w]) == 0 and w > 50 and h > 10:  # Ensure it's not the face region and large enough to be text
+        if np.mean(mask[y:y+h, x:x+w]) == 0:  # Ensure it's not the face region
             img[y:y+h, x:x+w] = cv2.GaussianBlur(img[y:y+h, x:x+w], (15, 15), 10)
     
     cv2.imwrite(output_name, img)
@@ -86,7 +76,7 @@ enable_cnic_blur = st.sidebar.checkbox("Blur CNIC Text Information", value=True)
 st.sidebar.subheader("📌 How to use XenFace?")
 st.sidebar.write("1️⃣ Upload your **CNIC Image**")
 st.sidebar.write("2️⃣ Upload your **Profile Picture**")
-st.sidebar.write("3️⃣ The system extracts & enhances your face")
+st.sidebar.write("3️⃣ The system extracts your face")
 st.sidebar.write("4️⃣ CNIC text can be blurred, and watermark added")
 st.sidebar.write("5️⃣ Your identity is verified with AI-powered face matching")
 
@@ -103,29 +93,25 @@ if cnic_file and profile_file:
     with open(profile_path, "wb") as f: f.write(profile_file.getbuffer())
 
     with st.spinner("Processing images..."):
-        profile_path, profile_error = extract_and_enhance_face(profile_path, "profile_face.jpg")
+        profile_path, profile_error = extract_face(profile_path, "profile_face.jpg")
         if profile_error:
             st.error(profile_error)
-        
+
         if enable_cnic_crop:
-            cnic_path, cnic_error = extract_and_enhance_face(cnic_path, "cnic_face.jpg")
+            cnic_path, cnic_error = extract_face(cnic_path, "cnic_face.jpg")
             if cnic_error:
                 st.error(cnic_error)
         
         if enable_cnic_blur:
-            cnic_blurred, _ = blur_cnic_text(cnic_path, "blurred_cnic.jpg")
-            if cnic_blurred:
-                cnic_path = cnic_blurred
+            cnic_path, _ = blur_cnic_text(cnic_path, "blurred_cnic.jpg")
         
     st.subheader("📷 Processed Face Images")
     col1, col2 = st.columns(2)
-    if profile_path:
-        with col1:
-            st.image(profile_path, caption="Enhanced Profile Picture", use_container_width=True)
-    if cnic_path:
-        with col2:
-            st.image(cnic_path, caption="Processed CNIC Image", use_container_width=True)
-    
+    with col1:
+        st.image(profile_path, caption="Profile Picture", use_container_width=True)
+    with col2:
+        st.image(cnic_path, caption="Processed CNIC Image", use_container_width=True)
+
     if st.button("🔍 Start Verification"):
         with st.spinner("Verifying faces..."):
             result, verify_error = verify_faces(profile_path, cnic_path)
