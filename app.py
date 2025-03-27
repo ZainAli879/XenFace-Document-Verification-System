@@ -3,7 +3,7 @@ import cv2
 import numpy as np
 import os
 import time
-import pytesseract
+import easyocr
 import re
 from deepface import DeepFace
 from PIL import Image
@@ -20,14 +20,17 @@ def is_cnic_image(image_path):
     if img is None:
         return False, "❌ Error: Unable to read image!"
 
-    # Convert to grayscale and apply OCR
-    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    text = pytesseract.image_to_string(gray)
+    # Initialize EasyOCR
+    reader = easyocr.Reader(['en'])
+    results = reader.readtext(img)
+
+    # Extract text
+    extracted_text = " ".join([res[1] for res in results])
 
     # CNIC format: 42101-1234567-8
     cnic_pattern = r"\b\d{5}-\d{7}-\d\b"
 
-    if re.search(cnic_pattern, text):
+    if re.search(cnic_pattern, extracted_text):
         return True, None
     else:
         return False, "❌ No valid CNIC number detected! Please upload a proper CNIC image."
@@ -52,31 +55,6 @@ def extract_face(image_path, output_name="face.jpg"):
     cv2.imwrite(output_name, face)
     return output_name, None
 
-# ===================== 📌 FUNCTION: Blur CNIC Text =====================
-def blur_cnic_text(image_path, output_name="blurred_cnic.jpg"):
-    img = cv2.imread(image_path)
-    if img is None:
-        return None, "❌ Error: CNIC Image not found!"
-    
-    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
-    faces = face_cascade.detectMultiScale(gray, 1.3, 5)
-    
-    mask = np.zeros_like(gray)
-    for (x, y, w, h) in faces:
-        mask[y:y+h, x:x+w] = 255  # Mark face area to exclude from blurring
-    
-    edged = cv2.Canny(gray, 30, 150)
-    contours, _ = cv2.findContours(edged, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-    
-    for cnt in contours:
-        x, y, w, h = cv2.boundingRect(cnt)
-        if np.mean(mask[y:y+h, x:x+w]) == 0:  # Ensure it's not the face region
-            img[y:y+h, x:x+w] = cv2.GaussianBlur(img[y:y+h, x:x+w], (15, 15), 10)
-    
-    cv2.imwrite(output_name, img)
-    return output_name, None
-
 # ===================== 📌 FUNCTION: Verify Faces =====================
 def verify_faces(img1_path, img2_path, threshold=0.66):
     try:
@@ -95,14 +73,12 @@ st.write("Upload your **CNIC image** and **profile picture** to verify identity.
 # 📌 Sidebar
 st.sidebar.header("Settings")
 enable_cnic_crop = st.sidebar.checkbox("Enable CNIC Face Cropping", value=True)
-enable_cnic_blur = st.sidebar.checkbox("Blur CNIC Text Information", value=True)
 
 st.sidebar.subheader("📌 How to use XenFace?")
 st.sidebar.write("1️⃣ Upload your **CNIC Image**")
 st.sidebar.write("2️⃣ Upload your **Profile Picture**")
 st.sidebar.write("3️⃣ The system extracts your face")
-st.sidebar.write("4️⃣ CNIC text can be blurred")
-st.sidebar.write("5️⃣ Your identity is verified with AI-powered face matching")
+st.sidebar.write("4️⃣ Your identity is verified with AI-powered face matching")
 
 # 📌 File Uploaders
 col1, col2 = st.columns(2)
@@ -136,9 +112,6 @@ if cnic_file and profile_file:
                         cnic_path, cnic_error = extract_face(cnic_path, "cnic_face.jpg")
                         if cnic_error:
                             st.error(cnic_error)
-                        else:
-                            if enable_cnic_blur:
-                                cnic_path, _ = blur_cnic_text(cnic_path, "blurred_cnic.jpg")
 
                     # Show processed images only if no errors occurred
                     st.subheader("📷 Processed Face Images")
