@@ -33,7 +33,7 @@ def is_cnic_image(image_path):
     if re.search(cnic_pattern, extracted_text):
         return True, None
     else:
-        return False, "❌ No valid CNIC image detected! Please upload a proper CNIC image."
+        return False, "❌ No valid CNIC number detected! Please upload a proper CNIC image."
 
 # ===================== 📌 FUNCTION: Blur CNIC Text =====================
 def blur_cnic_text(image_path, output_name="blurred_cnic.jpg"):
@@ -118,51 +118,47 @@ st.sidebar.markdown("""
 # 📌 File Uploaders
 col1, col2 = st.columns(2)
 with col1:
-    cnic_file = st.file_uploader("📄 Upload CNIC Image Only", type=["jpg", "png", "jpeg"])
+    cnic_file = st.file_uploader("📄 Upload CNIC Image", type=["jpg", "png", "jpeg"])
 with col2:
     profile_file = st.file_uploader("📄 Upload Profile Image", type=["jpg", "png", "jpeg"])
 
 if cnic_file and profile_file:
-    cnic_path, profile_path = "uploaded_cnic.jpg", "uploaded_profile.jpg"
-    with open(cnic_path, "wb") as f: f.write(cnic_file.getbuffer())
-    with open(profile_path, "wb") as f: f.write(profile_file.getbuffer())
-
-    with st.spinner("Processing images..."):
-        is_valid_cnic, cnic_error = is_cnic_image(cnic_path)
-        is_valid_profile, profile_error = is_cnic_image(profile_path)
-        
-        if not is_valid_cnic:
-            st.error(cnic_error)
-        elif is_valid_profile:
-            st.error("❌ Profile picture cannot be a CNIC image! Please upload a real profile photo.")
-        else:
-            if enable_cnic_crop:
-                cnic_path, cnic_error = extract_face(cnic_path, "cnic_face.jpg")
-                if cnic_error:
-                    st.error(cnic_error)
+    cnic_path, profile_path = "cnic_face.jpg", "profile_face.jpg"
+    
+    if not os.path.exists(cnic_path) or not os.path.exists(profile_path):
+        with st.spinner("Processing images..."):
+            raw_cnic_path, raw_profile_path = "uploaded_cnic.jpg", "uploaded_profile.jpg"
+            with open(raw_cnic_path, "wb") as f: f.write(cnic_file.getbuffer())
+            with open(raw_profile_path, "wb") as f: f.write(profile_file.getbuffer())
             
-            if enable_cnic_blur:
-                cnic_path, _ = blur_cnic_text(cnic_path, "blurred_cnic.jpg")
+            is_valid_cnic, cnic_error = is_cnic_image(raw_cnic_path)
+            is_valid_profile, profile_error = is_cnic_image(raw_profile_path)
             
-            profile_path, profile_error = extract_face(profile_path, "profile_face.jpg")
-            if profile_error:
-                st.error(profile_error)
+            if not is_valid_cnic:
+                st.error(cnic_error)
+            elif is_valid_profile:
+                st.error("❌ Profile picture cannot be a CNIC image! Please upload a real profile photo.")
             else:
-                st.subheader("📷 Processed Face Images")
-                col1, col2 = st.columns(2)
-                with col1:
-                    st.image(profile_path, caption="Profile Picture", use_container_width=True)
-                with col2:
-                    st.image(cnic_path, caption="Processed CNIC Image", use_container_width=True)
+                if enable_cnic_crop:
+                    cnic_path, _ = extract_face(raw_cnic_path, cnic_path)
+                if enable_cnic_blur:
+                    blur_cnic_text(cnic_path)
+                profile_path, _ = extract_face(raw_profile_path, profile_path)
                 
-                if st.button("🔍 Start Verification"):
-                    with st.spinner("Verifying faces..."):
-                        result, verify_error = verify_faces(profile_path, cnic_path)
-                        time.sleep(2)
-                    
-                    if verify_error:
-                        st.error(verify_error)
-                    else:
-                        st.subheader("✅ Verification Result")
-                        st.markdown(f"### {'✅ Identity Verified! Congrats Your Documents are successfully verified' if result['verified'] else '⚠️ Identity Mismatch!Please Upload Your Original Documents'}")
-                        st.write(f"**Distance Score:** {result['distance']:.4f}") 
+    st.subheader("📷 Processed Face Images")
+    col1, col2 = st.columns(2)
+    with col1:
+        st.image(profile_path, caption="Profile Picture", use_container_width=True)
+    with col2:
+        st.image(cnic_path, caption="Processed CNIC Image", use_container_width=True)
+    
+    if st.button("🔍 Start Verification"):
+        with st.spinner("Verifying faces..."):
+            result, verify_error = verify_faces(profile_path, cnic_path)
+            
+        if verify_error:
+            st.error(verify_error)
+        else:
+            st.subheader("✅ Verification Result")
+            st.markdown(f"### {'✅ Identity Verified!' if result['verified'] else '⚠️ Identity Mismatch!'}")
+            st.write(f"**Distance Score:** {result['distance']:.4f}")
