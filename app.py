@@ -7,7 +7,7 @@ from deepface import DeepFace
 from PIL import Image
 
 # ===================== \ud83d\udccc CONFIGURE STREAMLIT THEME =====================
-st.set_page_config(page_title="XenFace - Document Verification", page_icon="\ud83d\udd0d", layout="wide")
+st.set_page_config(page_title="XenFace - Document Verification", layout="wide")
 
 # ===================== \ud83d\udccc FUNCTION: Extract Face =====================
 def extract_face(image_path, output_name="face.jpg"):
