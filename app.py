@@ -42,12 +42,17 @@ def blur_cnic_text(image_path, output_name="blurred_cnic.jpg"):
         return None, "❌ Error: CNIC Image not found!"
     
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    edged = cv2.Canny(gray, 30, 150)
-    contours, _ = cv2.findContours(edged, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    reader = easyocr.Reader(['en'])
+    results = reader.readtext(gray)
     
-    for cnt in contours:
-        x, y, w, h = cv2.boundingRect(cnt)
-        img[y:y+h, x:x+w] = cv2.GaussianBlur(img[y:y+h, x:x+w], (15, 15), 10)
+    for (bbox, text, prob) in results:
+        (top_left, top_right, bottom_right, bottom_left) = bbox
+        x_min = int(min(top_left[0], bottom_left[0]))
+        y_min = int(min(top_left[1], top_right[1]))
+        x_max = int(max(top_right[0], bottom_right[0]))
+        y_max = int(max(bottom_left[1], bottom_right[1]))
+        
+        img[y_min:y_max, x_min:x_max] = cv2.GaussianBlur(img[y_min:y_max, x_min:x_max], (15, 15), 10)
     
     cv2.imwrite(output_name, img)
     return output_name, None
@@ -93,7 +98,13 @@ enable_cnic_crop = st.sidebar.checkbox("Enable CNIC Face Cropping", value=True)
 enable_cnic_blur = st.sidebar.checkbox("Blur CNIC Text Information", value=True)
 
 st.sidebar.header("How to Use XenFace")
-st.sidebar.markdown("1️⃣ **Upload CNIC Image**: Select a valid CNIC image containing a clear number.\n2️⃣ **Upload Profile Image**: Choose a clear profile picture for comparison.\n3️⃣ **Enable/Disable Options**: Toggle CNIC face cropping and text blurring.\n4️⃣ **View Processed Images**: Processed images will be displayed.\n5️⃣ **Start Verification**: Click the button to verify identity.\n")
+st.sidebar.markdown("""
+1️⃣ **Upload CNIC Image**: Select a valid CNIC image containing a clear number.
+2️⃣ **Upload Profile Image**: Choose a clear profile picture for comparison.
+3️⃣ **Enable/Disable Options**: Toggle CNIC face cropping and text blurring.
+4️⃣ **View Processed Images**: Processed images will be displayed before verification.
+5️⃣ **Start Verification**: Click the button to verify identity.
+""")
 
 # 📌 File Uploaders
 col1, col2 = st.columns(2)
@@ -109,7 +120,7 @@ if cnic_file and profile_file:
 
     with st.spinner("Processing images..."):
         is_valid_cnic, cnic_error = is_cnic_image(cnic_path)
-        is_valid_profile, profile_error = is_cnic_image(profile_path)  # Reverse validation
+        is_valid_profile, profile_error = is_cnic_image(profile_path)
         
         if not is_valid_cnic:
             st.error(cnic_error)
@@ -124,27 +135,27 @@ if cnic_file and profile_file:
                     cnic_path, cnic_error = extract_face(cnic_path, "cnic_face.jpg")
                     if cnic_error:
                         st.error(cnic_error)
-
+                
                 if enable_cnic_blur:
                     cnic_path, _ = blur_cnic_text(cnic_path, "blurred_cnic.jpg")
-
+                
                 st.subheader("📷 Processed Face Images")
                 col1, col2 = st.columns(2)
                 with col1:
                     st.image(profile_path, caption="Profile Picture", use_container_width=True)
                 with col2:
                     st.image(cnic_path, caption="Processed CNIC Image", use_container_width=True)
-
+                
                 if st.button("🔍 Start Verification"):
                     with st.spinner("Verifying faces..."):
                         result, verify_error = verify_faces(profile_path, cnic_path)
                         time.sleep(2)
-
+                    
                     if verify_error:
                         st.error(verify_error)
                     else:
                         st.subheader("✅ Verification Result")
-                        st.markdown(f"### {'✅  Congrats your documents are successfully Verified!' if result['verified'] else '⚠️ Identity Mismatch! Please upload your original documents'}")
+                        st.markdown(f"### {'✅ Identity Verified! Congrats Your Documents are verified successfully' if result['verified'] else '⚠️ Identity Mismatch! Please Upload Your Original Documents'}")
                         st.write(f"**Distance Score:** {result['distance']:.4f}")
                         st.write(f"**Threshold:** {result['threshold']:.2f}")
                         st.write(f"**Similarity Score:** {result['similarity_score']:.2f}")
