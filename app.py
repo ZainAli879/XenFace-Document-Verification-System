@@ -33,7 +33,7 @@ def is_cnic_image(image_path):
     if re.search(cnic_pattern, extracted_text):
         return True, None
     else:
-        return False, "❌ No valid CNIC number detected! Please upload a proper CNIC image."
+        return False, "❌ No valid CNIC image detected! Please upload a proper CNIC image."
 
 # ===================== 📌 FUNCTION: Validate Profile Image =====================
 def is_profile_valid(image_path):
@@ -150,7 +150,7 @@ if cnic_file and profile_file:
                                 st.error(verify_error)
                             else:
                                 st.subheader("✅ Verification Result")
-                                st.markdown(f"### {'✅ Identity Verified!' if result['verified'] else '⚠️ Identity Mismatch!'}")
+                                st.markdown(f"### {'✅ Congrats your documents are Verified Successfully!' if result['verified'] else '⚠️ Identity Mismatch! Please Upload Your Own documents'}")
                                 st.write(f"**Distance Score:** {result['distance']:.4f}")
                                 st.write(f"**Threshold:** {result['threshold']:.2f}")
                                 st.write(f"**Similarity Score:** {result['similarity_score']:.2f}")
