@@ -1,32 +1,31 @@
 import streamlit as st
 import cv2
 import numpy as np
+import os
 import time
 from deepface import DeepFace
-from PIL import Image, ImageEnhance
+from PIL import Image, ImageDraw, ImageFont, ImageEnhance
 
-# ===================== 📌 CONFIGURE STREAMLIT =====================
+# ===================== 📌 CONFIGURE STREAMLIT THEME =====================
 st.set_page_config(page_title="XenFace - Document Verification", page_icon="🔍", layout="wide")
 
-# ===================== 📌 FUNCTION: Enhance Image Quality =====================
-def enhance_image(image_path, output_name="enhanced.jpg"):
-    try:
-        img = Image.open(image_path)
-        enhancer = ImageEnhance.Sharpness(img)
-        img = enhancer.enhance(2.0)  # Increase sharpness
-        enhancer = ImageEnhance.Contrast(img)
-        img = enhancer.enhance(1.5)  # Increase contrast
-        img.save(output_name)
-        return output_name
-    except Exception:
-        return None
+st.markdown("""
+    <style>
+        .big-font {font-size:20px !important; font-weight: bold; color: #4CAF50;}
+        .stButton>button {background-color: #4CAF50; color: white; border-radius: 8px; border: none; padding: 12px; width: 100%;}
+        .stSpinner {color: #4CAF50 !important;}
+        .sidebar .sidebar-content {position: fixed; width: 300px;}
+        .stFileUploader>label {font-size: 16px !important; font-weight: bold;}
+        .stFileUploader div {max-width: 90%;} /* Reduce upload field size */
+    </style>
+""", unsafe_allow_html=True)
 
 # ===================== 📌 FUNCTION: Extract & Validate Single Face =====================
 def extract_single_face(image_path, output_name="cropped_face.jpg"):
     img = cv2.imread(image_path)
     if img is None:
         return None, "❌ Error: Image not found!"
-    
+
     face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     faces = face_cascade.detectMultiScale(gray, 1.3, 5)
@@ -34,18 +33,47 @@ def extract_single_face(image_path, output_name="cropped_face.jpg"):
     if len(faces) == 0:
         return None, "⚠️ No face detected! Upload a clear image."
     elif len(faces) > 1:
-        return None, "⚠️ Multiple faces detected! Upload an image with only one face."
+        return None, "⚠️ Multiple faces detected! Please upload an image with only one face."
 
     x, y, w, h = faces[0]
     face = img[y:y+h, x:x+w]
     cv2.imwrite(output_name, face)
     return output_name, None
 
+# ===================== 📌 FUNCTION: Enhance Image Quality =====================
+def enhance_image(image_path, output_name="enhanced.jpg"):
+    img = Image.open(image_path)
+    enhancer = ImageEnhance.Sharpness(img)
+    img = enhancer.enhance(2.0)  # Increase sharpness
+    enhancer = ImageEnhance.Contrast(img)
+    img = enhancer.enhance(1.5)  # Increase contrast
+    img.save(output_name)
+    return output_name
+
+# ===================== 📌 FUNCTION: Add Watermark =====================
+def add_watermark(image_path, output_name="watermarked_cnic.jpg", text="XenFace Secure"):
+    img = Image.open(image_path).convert("RGBA")
+    watermark = Image.new("RGBA", img.size, (255, 255, 255, 0))
+    draw = ImageDraw.Draw(watermark)
+    font = ImageFont.load_default()
+    text_position = (10, img.size[1] - 30)
+    draw.text(text_position, text, fill=(255, 255, 255, 128), font=font)
+    img = Image.alpha_composite(img, watermark)
+    img.convert("RGB").save(output_name)
+    return output_name
+
+# ===================== 📌 FUNCTION: Resize Image =====================
+def resize_image(image_path, output_name="resized.jpg"):
+    img = Image.open(image_path).resize((250, 250))
+    img.save(output_name)
+    return output_name
+
 # ===================== 📌 FUNCTION: Verify Faces =====================
-def verify_faces(img1_path, img2_path, threshold=0.66):
+def verify_faces(img1_path, img2_path, model_name="ArcFace", detector_backend="mtcnn", threshold=0.66):
     try:
-        result = DeepFace.verify(img1_path, img2_path, model_name="ArcFace", detector_backend="mtcnn")
+        result = DeepFace.verify(img1_path, img2_path, model_name=model_name, detector_backend=detector_backend)
         result["verified"] = result["distance"] <= threshold
+        result["threshold"] = threshold
         return result, None
     except Exception as e:
         return None, f"❌ Error during verification: {str(e)}"
@@ -54,6 +82,10 @@ def verify_faces(img1_path, img2_path, threshold=0.66):
 st.title("🔍 XenFace - Document Verification System")
 st.write("Upload your **CNIC image** and **profile picture** to verify identity.")
 
+# 📌 Sidebar (Fixed and Fully Visible)
+st.sidebar.header("Settings")
+enable_cnic_crop = st.sidebar.checkbox("Enable CNIC Face Cropping", value=False)
+
 # 📌 File Uploaders
 col1, col2 = st.columns(2)
 with col1:
@@ -61,48 +93,41 @@ with col1:
 with col2:
     profile_file = st.file_uploader("📤 Upload Profile Image", type=["jpg", "png", "jpeg"])
 
-# 📌 Optional CNIC Cropping Selection
-crop_cnic = st.checkbox("Crop CNIC Face?", value=False)
-
 if cnic_file and profile_file:
     cnic_path, profile_path = "uploaded_cnic.jpg", "uploaded_profile.jpg"
     with open(cnic_path, "wb") as f: f.write(cnic_file.getbuffer())
     with open(profile_path, "wb") as f: f.write(profile_file.getbuffer())
 
     with st.spinner("Processing images..."):
-        # Face extraction (Profile always cropped)
         profile_path, profile_error = extract_single_face(profile_path, "profile_face.jpg")
-        cnic_path, cnic_error = extract_single_face(cnic_path, "cnic_face.jpg") if crop_cnic else (cnic_path, None)
+        profile_path = enhance_image(profile_path, "enhanced_profile.jpg")
 
-        # Display errors & prevent processing invalid images
+        if enable_cnic_crop:
+            cnic_path, cnic_error = extract_single_face(cnic_path, "cnic_face.jpg")
+        
+        cnic_path = enhance_image(cnic_path, "enhanced_cnic.jpg")
+        
         if profile_error:
             st.error(profile_error)
-        if cnic_error:
+        if enable_cnic_crop and cnic_error:
             st.error(cnic_error)
 
-        if not profile_path or not cnic_path:
-            st.warning("⚠️ Cannot proceed due to face detection errors.")
+    st.subheader("📷 Processed Face Images")
+    col1, col2 = st.columns(2)
+    with col1:
+        st.image(profile_path, caption="Enhanced Profile Picture", use_container_width=True)
+    with col2:
+        st.image(cnic_path, caption="Enhanced CNIC Image", use_container_width=True)
+
+    if st.button("🔍 Start Verification"):
+        with st.spinner("Verifying faces..."):
+            result, verify_error = verify_faces(profile_path, cnic_path)
+            time.sleep(2)
+
+        if verify_error:
+            st.error(verify_error)
         else:
-            # Enhance Image Quality
-            profile_path = enhance_image(profile_path, "enhanced_profile.jpg")
-            cnic_path = enhance_image(cnic_path, "enhanced_cnic.jpg")
-
-            # Display Processed Images
-            col1, col2 = st.columns(2)
-            with col1:
-                st.image(profile_path, caption="Enhanced Profile Picture", use_container_width=True)
-            with col2:
-                st.image(cnic_path, caption="Enhanced CNIC Image", use_container_width=True)
-
-            if st.button("🔍 Start Verification"):
-                with st.spinner("Verifying faces..."):
-                    result, verify_error = verify_faces(profile_path, cnic_path)
-                    time.sleep(2)
-
-                if verify_error:
-                    st.error(verify_error)
-                else:
-                    st.subheader("✅ Verification Result")
-                    st.markdown(f"### {'✅ Identity Verified!' if result['verified'] else '⚠️ Identity Mismatch!'}")
+            st.subheader("✅ Verification Result")
+            st.markdown(f"### {'✅ Identity Verified!' if result['verified'] else '⚠️ Identity Mismatch!'}")
 else:
     st.warning("⚠️ Please upload both images to proceed!")
