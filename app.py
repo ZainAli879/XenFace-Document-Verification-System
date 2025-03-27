@@ -57,7 +57,7 @@ def blur_cnic_text(image_path, output_name="blurred_cnic.jpg"):
 # ===================== 📌 FUNCTION: Verify Faces =====================
 def verify_faces(img1_path, img2_path, threshold=0.66):
     try:
-        result = DeepFace.verify(img1_path, img2_path, model_name="ArcFace", detector_backend="mtcnn")
+        result = DeepFace.verify(img1_path, img2_path, model_name="ArcFace", detector_backend="opencv")
         result["verified"] = result["distance"] <= threshold
         result["threshold"] = threshold
         return result, None
@@ -122,5 +122,6 @@ if cnic_file and profile_file:
         else:
             st.subheader("✅ Verification Result")
             st.markdown(f"### {'✅ Identity Verified!' if result['verified'] else '⚠️ Identity Mismatch!'}")
+            st.write(f"**Similarity Score:** {1 - result['distance']:.2f}")
 else:
     st.warning("⚠️ Please upload both images to proceed!")
