@@ -92,6 +92,9 @@ st.sidebar.header("Settings")
 enable_cnic_crop = st.sidebar.checkbox("Enable CNIC Face Cropping", value=True)
 enable_cnic_blur = st.sidebar.checkbox("Blur CNIC Text Information", value=True)
 
+st.sidebar.header("How to Use XenFace")
+st.sidebar.markdown("1️⃣ **Upload CNIC Image**: Select a valid CNIC image containing a clear number.\n2️⃣ **Upload Profile Image**: Choose a clear profile picture for comparison.\n3️⃣ **Enable/Disable Options**: Toggle CNIC face cropping and text blurring.\n4️⃣ **View Processed Images**: Processed images will be displayed.\n5️⃣ **Start Verification**: Click the button to verify identity.\n")
+
 # 📌 File Uploaders
 col1, col2 = st.columns(2)
 with col1:
@@ -125,6 +128,13 @@ if cnic_file and profile_file:
                 if enable_cnic_blur:
                     cnic_path, _ = blur_cnic_text(cnic_path, "blurred_cnic.jpg")
 
+                st.subheader("📷 Processed Face Images")
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.image(profile_path, caption="Profile Picture", use_container_width=True)
+                with col2:
+                    st.image(cnic_path, caption="Processed CNIC Image", use_container_width=True)
+
                 if st.button("🔍 Start Verification"):
                     with st.spinner("Verifying faces..."):
                         result, verify_error = verify_faces(profile_path, cnic_path)
@@ -134,14 +144,7 @@ if cnic_file and profile_file:
                         st.error(verify_error)
                     else:
                         st.subheader("✅ Verification Result")
-                        st.markdown(f"### {'✅ Identity Verified!' if result['verified'] else '⚠️ Identity Mismatch!'}")
+                        st.markdown(f"### {'✅  Congrats your documents are successfully Verified!' if result['verified'] else '⚠️ Identity Mismatch! Please upload your original documents'}")
                         st.write(f"**Distance Score:** {result['distance']:.4f}")
                         st.write(f"**Threshold:** {result['threshold']:.2f}")
                         st.write(f"**Similarity Score:** {result['similarity_score']:.2f}")
-                        
-                        st.subheader("📷 Processed Face Images")
-                        col1, col2 = st.columns(2)
-                        with col1:
-                            st.image(profile_path, caption="Profile Picture", use_container_width=True)
-                        with col2:
-                            st.image(cnic_path, caption="Processed CNIC Image", use_container_width=True)
