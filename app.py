@@ -35,6 +35,29 @@ def is_cnic_image(image_path):
     else:
         return False, "❌ No valid CNIC number detected! Please upload a proper CNIC image."
 
+# ===================== 📌 FUNCTION: Validate Profile Image =====================
+def is_profile_valid(image_path):
+    """
+    Checks if the uploaded profile image is a valid face image (not a CNIC document).
+    """
+    img = cv2.imread(image_path)
+    if img is None:
+        return False, "❌ Error: Unable to read image!"
+
+    # Initialize EasyOCR
+    reader = easyocr.Reader(['en'])
+    results = reader.readtext(img)
+
+    # Extract text
+    extracted_text = " ".join([res[1] for res in results])
+
+    # CNIC format: 42101-1234567-8
+    cnic_pattern = r"\b\d{5}-\d{7}-\d\b"
+
+    if re.search(cnic_pattern, extracted_text):
+        return False, "❌ Profile image cannot contain a CNIC! Please upload a real face picture."
+    return True, None
+
 # ===================== 📌 FUNCTION: Extract Face =====================
 def extract_face(image_path, output_name="face.jpg"):
     img = cv2.imread(image_path)
@@ -102,36 +125,32 @@ if cnic_file and profile_file:
             if not is_valid_cnic:
                 st.error(cnic_error)
             else:
-                # Extract face from profile image
-                profile_path, profile_error = extract_face(profile_path, "profile_face.jpg")
-                if profile_error:
+                # Validate Profile Image
+                is_valid_profile, profile_error = is_profile_valid(profile_path)
+                if not is_valid_profile:
                     st.error(profile_error)
                 else:
-                    # Extract face from CNIC if enabled
-                    if enable_cnic_crop:
-                        cnic_path, cnic_error = extract_face(cnic_path, "cnic_face.jpg")
-                        if cnic_error:
-                            st.error(cnic_error)
+                    # Extract faces
+                    profile_path, profile_error = extract_face(profile_path, "profile_face.jpg")
+                    if profile_error:
+                        st.error(profile_error)
+                    else:
+                        if enable_cnic_crop:
+                            cnic_path, cnic_error = extract_face(cnic_path, "cnic_face.jpg")
+                            if cnic_error:
+                                st.error(cnic_error)
 
-                    # Show processed images only if no errors occurred
-                    st.subheader("📷 Processed Face Images")
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        st.image(profile_path, caption="Profile Picture", use_container_width=True)
-                    with col2:
-                        st.image(cnic_path, caption="Processed CNIC Image", use_container_width=True)
+                        # Face Verification
+                        if st.button("🔍 Start Verification"):
+                            with st.spinner("Verifying faces..."):
+                                result, verify_error = verify_faces(profile_path, cnic_path)
+                                time.sleep(2)
 
-                    # Face Verification
-                    if st.button("🔍 Start Verification"):
-                        with st.spinner("Verifying faces..."):
-                            result, verify_error = verify_faces(profile_path, cnic_path)
-                            time.sleep(2)
-
-                        if verify_error:
-                            st.error(verify_error)
-                        else:
-                            st.subheader("✅ Verification Result")
-                            st.markdown(f"### {'✅ Identity Verified!' if result['verified'] else '⚠️ Identity Mismatch!'}")
-                            st.write(f"**Distance Score:** {result['distance']:.4f}")
-                            st.write(f"**Threshold:** {result['threshold']:.2f}")
-                            st.write(f"**Similarity Score:** {result['similarity_score']:.2f}")
+                            if verify_error:
+                                st.error(verify_error)
+                            else:
+                                st.subheader("✅ Verification Result")
+                                st.markdown(f"### {'✅ Identity Verified!' if result['verified'] else '⚠️ Identity Mismatch!'}")
+                                st.write(f"**Distance Score:** {result['distance']:.4f}")
+                                st.write(f"**Threshold:** {result['threshold']:.2f}")
+                                st.write(f"**Similarity Score:** {result['similarity_score']:.2f}")
