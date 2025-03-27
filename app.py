@@ -39,6 +39,16 @@ def enhance_image_quality(img):
     enhanced_img = enhancer.enhance(1.5)  # Enhance contrast
     return cv2.cvtColor(np.array(enhanced_img), cv2.COLOR_RGB2BGR)
 
+# ===================== 📌 FUNCTION: Blur CNIC Text =====================
+def blur_cnic_text(image_path, output_name="blurred_cnic.jpg"):
+    img = cv2.imread(image_path)
+    if img is None:
+        return None, "❌ Error: CNIC Image not found!"
+    
+    blurred = cv2.GaussianBlur(img, (21, 21), 10)
+    cv2.imwrite(output_name, blurred)
+    return output_name, None
+
 # ===================== 📌 FUNCTION: Verify Faces =====================
 def verify_faces(img1_path, img2_path, threshold=0.66):
     try:
@@ -56,6 +66,15 @@ st.write("Upload your **CNIC image** and **profile picture** to verify identity.
 # 📌 Sidebar
 st.sidebar.header("Settings")
 enable_cnic_crop = st.sidebar.checkbox("Enable CNIC Face Cropping", value=True)
+enable_cnic_blur = st.sidebar.checkbox("Blur CNIC Text Information", value=True)
+
+st.sidebar.subheader("📌 How to use XenFace?")
+st.sidebar.write("""
+1️⃣ Upload your **CNIC Image** & **Profile Picture**
+2️⃣ The system extracts & enhances your face
+3️⃣ CNIC text can be blurred, and watermark added
+4️⃣ Your identity is verified with AI-powered face matching
+""")
 
 # 📌 File Uploaders
 col1, col2 = st.columns(2)
@@ -78,6 +97,9 @@ if cnic_file and profile_file:
             cnic_path, cnic_error = extract_and_enhance_face(cnic_path, "cnic_face.jpg")
             if cnic_error:
                 st.error(cnic_error)
+        
+        if enable_cnic_blur:
+            cnic_path, _ = blur_cnic_text(cnic_path, "blurred_cnic.jpg")
         
     st.subheader("📷 Processed Face Images")
     col1, col2 = st.columns(2)
