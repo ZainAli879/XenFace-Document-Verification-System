@@ -45,8 +45,16 @@ def blur_cnic_text(image_path, output_name="blurred_cnic.jpg"):
     if img is None:
         return None, "❌ Error: CNIC Image not found!"
     
-    blurred = cv2.GaussianBlur(img, (21, 21), 10)
-    cv2.imwrite(output_name, blurred)
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    _, thresh = cv2.threshold(gray, 120, 255, cv2.THRESH_BINARY_INV)
+    contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    
+    for cnt in contours:
+        x, y, w, h = cv2.boundingRect(cnt)
+        if w > 50 and h > 10:  # Filtering small contours (likely noise)
+            img[y:y+h, x:x+w] = cv2.GaussianBlur(img[y:y+h, x:x+w], (15, 15), 10)
+    
+    cv2.imwrite(output_name, img)
     return output_name, None
 
 # ===================== 📌 FUNCTION: Verify Faces =====================
@@ -69,12 +77,11 @@ enable_cnic_crop = st.sidebar.checkbox("Enable CNIC Face Cropping", value=True)
 enable_cnic_blur = st.sidebar.checkbox("Blur CNIC Text Information", value=True)
 
 st.sidebar.subheader("📌 How to use XenFace?")
-st.sidebar.write("""
-1️⃣ Upload your **CNIC Image** & **Profile Picture**
-2️⃣ The system extracts & enhances your face
-3️⃣ CNIC text can be blurred, and watermark added
-4️⃣ Your identity is verified with AI-powered face matching
-""")
+st.sidebar.write("1️⃣ Upload your **CNIC Image**")
+st.sidebar.write("2️⃣ Upload your **Profile Picture**")
+st.sidebar.write("3️⃣ The system extracts & enhances your face")
+st.sidebar.write("4️⃣ CNIC text can be blurred, and watermark added")
+st.sidebar.write("5️⃣ Your identity is verified with AI-powered face matching")
 
 # 📌 File Uploaders
 col1, col2 = st.columns(2)
