@@ -66,7 +66,7 @@ def verify_faces(img1_path, img2_path, threshold=0.66):
         return None, f"❌ Error during verification: {str(e)}"
 
 # ===================== \ud83d\udccc STREAMLIT UI =====================
-st.title("\ud83d\udd0d XenFace - Document Verification System")
+st.title("XenFace - Document Verification System")
 st.write("Upload your **CNIC image** and **profile picture** to verify identity.")
 
 # \ud83d\udccc Sidebar
