@@ -33,7 +33,7 @@ def is_cnic_image(image_path):
     if re.search(cnic_pattern, extracted_text):
         return True, None
     else:
-        return False, "❌ No valid CNIC number detected! Please upload a proper CNIC image."
+        return False, "❌ No valid CNIC image detected! Please upload a proper CNIC image."
 
 # ===================== 📌 FUNCTION: Blur CNIC Text =====================
 def blur_cnic_text(image_path, output_name="blurred_cnic.jpg"):
@@ -99,17 +99,26 @@ enable_cnic_blur = st.sidebar.checkbox("Blur CNIC Text Information", value=True)
 
 st.sidebar.header("How to Use XenFace")
 st.sidebar.markdown("""
-1️⃣ **Upload CNIC Image**: Select a valid CNIC image containing a clear number.
-2️⃣ **Upload Profile Image**: Choose a clear profile picture for comparison.
-3️⃣ **Enable/Disable Options**: Toggle CNIC face cropping and text blurring.
-4️⃣ **View Processed Images**: Processed images will be displayed before verification.
-5️⃣ **Start Verification**: Click the button to verify identity.
+### 1️⃣ Upload CNIC Image
+- Select a valid CNIC image containing a clear number.
+
+### 2️⃣ Upload Profile Image
+- Choose a clear profile picture for comparison.
+
+### 3️⃣ Enable/Disable Options
+- Toggle CNIC face cropping and text blurring.
+
+### 4️⃣ View Processed Images
+- Processed images will be displayed before verification.
+
+### 5️⃣ Start Verification
+- Click the button to verify identity.
 """)
 
 # 📌 File Uploaders
 col1, col2 = st.columns(2)
 with col1:
-    cnic_file = st.file_uploader("📄 Upload CNIC Image", type=["jpg", "png", "jpeg"])
+    cnic_file = st.file_uploader("📄 Upload CNIC Image Only", type=["jpg", "png", "jpeg"])
 with col2:
     profile_file = st.file_uploader("📄 Upload Profile Image", type=["jpg", "png", "jpeg"])
 
@@ -127,18 +136,18 @@ if cnic_file and profile_file:
         elif is_valid_profile:
             st.error("❌ Profile picture cannot be a CNIC image! Please upload a real profile photo.")
         else:
+            if enable_cnic_crop:
+                cnic_path, cnic_error = extract_face(cnic_path, "cnic_face.jpg")
+                if cnic_error:
+                    st.error(cnic_error)
+            
+            if enable_cnic_blur:
+                cnic_path, _ = blur_cnic_text(cnic_path, "blurred_cnic.jpg")
+            
             profile_path, profile_error = extract_face(profile_path, "profile_face.jpg")
             if profile_error:
                 st.error(profile_error)
             else:
-                if enable_cnic_crop:
-                    cnic_path, cnic_error = extract_face(cnic_path, "cnic_face.jpg")
-                    if cnic_error:
-                        st.error(cnic_error)
-                
-                if enable_cnic_blur:
-                    cnic_path, _ = blur_cnic_text(cnic_path, "blurred_cnic.jpg")
-                
                 st.subheader("📷 Processed Face Images")
                 col1, col2 = st.columns(2)
                 with col1:
@@ -155,7 +164,5 @@ if cnic_file and profile_file:
                         st.error(verify_error)
                     else:
                         st.subheader("✅ Verification Result")
-                        st.markdown(f"### {'✅ Identity Verified! Congrats Your Documents are verified successfully' if result['verified'] else '⚠️ Identity Mismatch! Please Upload Your Original Documents'}")
+                        st.markdown(f"### {'✅ Identity Verified! Congrats Your Documents are successfully verified' if result['verified'] else '⚠️ Identity Mismatch!Please Upload Your Original Documents'}")
                         st.write(f"**Distance Score:** {result['distance']:.4f}")
-                        st.write(f"**Threshold:** {result['threshold']:.2f}")
-                        st.write(f"**Similarity Score:** {result['similarity_score']:.2f}")
