@@ -51,16 +51,8 @@ def extract_face(image):
     return Image.fromarray(face), None
 
 # ===================== 📌 FUNCTION: Verify Faces =====================
-def verify_faces(img1, img2, threshold=0.66):
+def verify_faces(img1_path, img2_path, threshold=0.66):
     try:
-        with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as temp1:
-            img1.save(temp1.name)
-            img1_path = temp1.name
-        
-        with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as temp2:
-            img2.save(temp2.name)
-            img2_path = temp2.name
-
         result = DeepFace.verify(img1_path, img2_path, model_name="ArcFace", detector_backend="opencv")
         distance = result["distance"]
         result["verified"] = distance <= threshold
@@ -98,15 +90,12 @@ if cnic_file and profile_file:
         elif is_valid_profile:
             st.error("❌ Profile picture cannot be a CNIC image! Upload a real profile photo.")
         else:
-            if enable_cnic_crop:
-                cnic_face, cnic_error = extract_face(cnic_image)
-                if cnic_error:
-                    st.error(cnic_error)
-                else:
-                    cnic_image = cnic_face
-            
+            cnic_face, cnic_error = extract_face(cnic_image) if enable_cnic_crop else (cnic_image, None)
             profile_face, profile_error = extract_face(profile_image)
-            if profile_error:
+
+            if cnic_error:
+                st.error(cnic_error)
+            elif profile_error:
                 st.error(profile_error)
             else:
                 st.subheader("📷 Processed Face Images")
@@ -114,13 +103,21 @@ if cnic_file and profile_file:
                 with col1:
                     st.image(profile_face, caption="Profile Picture", use_container_width=True)
                 with col2:
-                    st.image(cnic_image, caption="Processed CNIC Image", use_container_width=True)
-
+                    st.image(cnic_face, caption="Processed CNIC Image", use_container_width=True)
+                
+                # Save processed images to temp files
+                with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as temp1:
+                    profile_face.save(temp1.name)
+                    profile_face_path = temp1.name
+                with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as temp2:
+                    cnic_face.save(temp2.name)
+                    cnic_face_path = temp2.name
+                
                 with st.form(key="verify_form"):
                     submit = st.form_submit_button("🔍 Start Verification")
                     if submit:
                         with st.spinner("Verifying faces..."):
-                            result, verify_error = verify_faces(profile_face, cnic_image)
+                            result, verify_error = verify_faces(profile_face_path, cnic_face_path)
                         
                         if verify_error:
                             st.error(verify_error)
