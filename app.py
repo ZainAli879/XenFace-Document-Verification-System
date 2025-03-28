@@ -23,7 +23,7 @@ def is_valid_cnic(image_path):
         return False
 
 # ===================== 📌 FACE EXTRACTION FUNCTION =====================
-def extract_face(image_path):
+def extract_face(image_path, output_name):
     img = cv2.imread(image_path)
     if img is None:
         return None, "❌ Error: Image not found!"
@@ -41,12 +41,11 @@ def extract_face(image_path):
 
     x, y, w, h = faces[0]
     face = img[y:y+h, x:x+w]
-    cropped_face_path = "cropped_face.jpg"
-    cv2.imwrite(cropped_face_path, face)
-    return cropped_face_path, None
+    cv2.imwrite(output_name, face)
+    return output_name, None
 
 # ===================== 📌 IMAGE RESIZING FUNCTION =====================
-def resize_image(image_path, output_name="resized.jpg"):
+def resize_image(image_path, output_name):
     img = Image.open(image_path)
     img = img.resize((250, 250))  # Resize for DeepFace processing
     img.save(output_name)
@@ -97,9 +96,9 @@ if cnic_file and profile_file:
     if not is_valid_cnic(cnic_path):
         st.error("❌ Invalid CNIC image! Please upload a valid CNIC with a readable ID number.")
     else:
-        # Extract Faces
-        cnic_face_path, cnic_error = extract_face(cnic_path)
-        profile_face_path, profile_error = extract_face(profile_path)
+        # Extract Faces with unique names
+        cnic_face_path, cnic_error = extract_face(cnic_path, "cnic_face.jpg")
+        profile_face_path, profile_error = extract_face(profile_path, "profile_face.jpg")
 
         if cnic_error:
             st.error(cnic_error)
