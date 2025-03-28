@@ -11,13 +11,14 @@ reader = easyocr.Reader(['en'])
 
 # ===================== 📌 CNIC VALIDATION FUNCTION =====================
 def is_valid_cnic(image_path):
-    """Checks if the uploaded CNIC image contains a valid CNIC number."""
+    """Checks if the uploaded CNIC image contains government logos and key text patterns."""
     try:
         result = reader.readtext(image_path)
-        for _, text, _ in result:
-            clean_text = text.replace(" ", "").replace("-", "")
-            if clean_text.isdigit() and len(clean_text) == 13:  # CNIC format
-                return True
+        keywords = ["Government", "Pakistan", "Identity", "Card"]  # Key CNIC-related words
+        
+        detected_texts = [text.lower() for _, text, _ in result]
+        if any(keyword.lower() in detected_texts for keyword in keywords):
+            return True
         return False
     except Exception as e:
         return False
@@ -52,7 +53,7 @@ def resize_image(image_path, output_name):
     return output_name
 
 # ===================== 📌 FACE VERIFICATION FUNCTION =====================
-def verify_faces(img1_path, img2_path, model_name="Facenet512", detector_backend="retinaface", threshold=0.66):
+def verify_faces(img1_path, img2_path, model_name="Facenet512", detector_backend="retinaface", threshold=0.75):
     try:
         if not os.path.exists(img1_path) or not os.path.exists(img2_path):
             return None, "⚠️ One or both processed images are missing. Verification cannot proceed."
@@ -94,7 +95,7 @@ if cnic_file and profile_file:
 
     # Validate CNIC Image
     if not is_valid_cnic(cnic_path):
-        st.error("❌ Invalid CNIC image! Please upload a valid CNIC with a readable ID number.")
+        st.error("❌ Invalid CNIC image! Please upload a valid CNIC with recognizable government logos and text.")
     else:
         # Extract Faces with unique names
         cnic_face_path, cnic_error = extract_face(cnic_path, "cnic_face.jpg")
