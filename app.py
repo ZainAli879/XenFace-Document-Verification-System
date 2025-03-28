@@ -11,33 +11,35 @@ import tempfile
 # ===================== 📌 CONFIGURE STREAMLIT =====================
 st.set_page_config(page_title="XenFace - Document Verification", page_icon="🔍", layout="wide")
 
-# ===================== 📌 CACHED DEEPFACE MODEL =====================
+# ===================== 📌 CACHED MODELS =====================
 @st.cache_resource
 def load_deepface():
     return DeepFace.build_model("ArcFace")
 
 deepface_model = load_deepface()
 
+@st.cache_resource
+def load_easyocr():
+    return easyocr.Reader(['en'])
+
+easyocr_reader = load_easyocr()
+
 # ===================== 📌 FUNCTION: Validate CNIC Image =====================
 def is_cnic_image(image):
     img = np.array(image)
-    reader = easyocr.Reader(['en'])
-    results = reader.readtext(img)
+    results = easyocr_reader.readtext(img)
 
     extracted_text = " ".join([res[1] for res in results])
     cnic_pattern = r"\b\d{5}-\d{7}-\d\b"
 
-    if re.search(cnic_pattern, extracted_text):
-        return True, None
-    else:
-        return False, "❌ No valid CNIC image detected!"
+    return (True, None) if re.search(cnic_pattern, extracted_text) else (False, "❌ No valid CNIC image detected!")
 
 # ===================== 📌 FUNCTION: Extract Face =====================
 def extract_face(image):
     img = np.array(image)
     gray = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
     face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
-    faces = face_cascade.detectMultiScale(gray, 1.3, 5)
+    faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5)
 
     if len(faces) == 0:
         return None, "⚠️ No face detected!"
@@ -84,8 +86,8 @@ with col2:
     profile_file = st.file_uploader("📄 Upload Profile Image", type=["jpg", "png", "jpeg"])
 
 if cnic_file and profile_file:
-    cnic_image = Image.open(cnic_file)
-    profile_image = Image.open(profile_file)
+    cnic_image = Image.open(cnic_file).convert("RGB")
+    profile_image = Image.open(profile_file).convert("RGB")
 
     with st.spinner("Processing images..."):
         is_valid_cnic, cnic_error = is_cnic_image(cnic_image)
