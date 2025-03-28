@@ -52,7 +52,7 @@ def resize_image(image_path, output_name):
     return output_name
 
 # ===================== 📌 FACE VERIFICATION FUNCTION =====================
-def verify_faces(img1_path, img2_path, model_name="ArcFace", detector_backend="mtcnn", threshold=0.66):
+def verify_faces(img1_path, img2_path, model_name="ArcFace", detector_backend="mtcnn", threshold=0.65):
     try:
         if not os.path.exists(img1_path) or not os.path.exists(img2_path):
             return None, "⚠️ One or both processed images are missing. Verification cannot proceed."
