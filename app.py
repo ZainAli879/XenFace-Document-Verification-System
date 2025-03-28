@@ -12,28 +12,24 @@ from PIL import Image
 st.set_page_config(page_title="XenFace - Document Verification", page_icon="🔍", layout="wide")
 
 # ===================== 📌 FUNCTION: Validate CNIC Image =====================
-def is_cnic_image(image_path):
+def detect_cnic_template(image_path, template_path):
     """
-    Checks if the uploaded image is a valid CNIC by detecting a CNIC-like number using OCR.
+    Detects CNIC by matching a predefined CNIC template using OpenCV.
     """
-    img = cv2.imread(image_path)
-    if img is None:
-        return False, "❌ Error: Unable to read image!"
+    img = cv2.imread(image_path, 0)  # Load in grayscale
+    template = cv2.imread(template_path, 0)  # Load CNIC template
 
-    # Initialize EasyOCR
-    reader = easyocr.Reader(['en'])
-    results = reader.readtext(img)
+    if img is None or template is None:
+        return False, "❌ Error: Unable to read image or template!"
 
-    # Extract text
-    extracted_text = " ".join([res[1] for res in results])
+    # Match template
+    result = cv2.matchTemplate(img, template, cv2.TM_CCOEFF_NORMED)
+    min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(result)
 
-    # CNIC format: 42101-1234567-8
-    cnic_pattern = r"\b\d{5}-\d{7}-\d\b"
-
-    if re.search(cnic_pattern, extracted_text):
+    if max_val > 0.8:  # Threshold for match confidence
         return True, None
     else:
-        return False, "❌ No valid CNIC image detected! Please upload a proper CNIC image."
+        return False, "❌ No valid CNIC detected!"
 
 # ===================== 📌 FUNCTION: Blur CNIC Text =====================
 def blur_cnic_text(image_path, output_name="blurred_cnic.jpg"):
