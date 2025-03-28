@@ -1,128 +1,147 @@
+#app.py
 import streamlit as st
 import cv2
 import numpy as np
-import easyocr
-import re
+import os
 from deepface import DeepFace
 from PIL import Image
-from io import BytesIO
-import tempfile
 
-# ===================== 📌 CONFIGURE STREAMLIT =====================
-st.set_page_config(page_title="XenFace - Document Verification", page_icon="🔍", layout="wide")
+# ===================== 📌 FACE EXTRACTION FUNCTION =====================
+def extract_face(image_path, output_name="cropped_face.jpg"):
+    img = cv2.imread(image_path)
+    if img is None:
+        return None, "❌ Error: Image not found!"
 
-# ===================== 📌 CACHED MODELS =====================
-@st.cache_resource
-def load_deepface():
-    return DeepFace.build_model("ArcFace")
+    cascade_path = cv2.data.haarcascades + "haarcascade_frontalface_default.xml"
+    face_cascade = cv2.CascadeClassifier(cascade_path)
 
-deepface_model = load_deepface()
-
-@st.cache_resource
-def load_easyocr():
-    return easyocr.Reader(['en', 'ur'])  # Added Urdu support
-
-easyocr_reader = load_easyocr()
-
-# ===================== 📌 FUNCTION: Validate CNIC Image =====================
-def is_cnic_image(image):
-    img = np.array(image)
-    results = easyocr_reader.readtext(img)
-
-    extracted_text = " ".join([res[1] for res in results])
-    cnic_pattern = r"\b\d{5}-\d{7}-\d\b"
-
-    return (True, None) if re.search(cnic_pattern, extracted_text) else (False, "❌ No valid CNIC image detected!")
-
-# ===================== 📌 FUNCTION: Extract Face =====================
-def extract_face(image):
-    img = np.array(image)
-    gray = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
-    face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
-    faces = face_cascade.detectMultiScale(gray, scaleFactor=1.05, minNeighbors=6, minSize=(30, 30))  # Optimized parameters
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    faces = face_cascade.detectMultiScale(gray, 1.3, 5)
 
     if len(faces) == 0:
-        return None, "⚠️ No face detected!"
+        return None, "⚠️ No face detected! Please upload a clear image with your face."
     elif len(faces) > 1:
-        return None, "⚠️ Multiple faces detected! Please upload an image with only one face."
-    
+        # Draw bounding boxes around detected faces
+        for (x, y, w, h) in faces:
+            cv2.rectangle(img, (x, y), (x + w, y + h), (0, 0, 255), 2)
+        cv2.imwrite("multiple_faces_detected.jpg", img)
+        return None, "⚠️ Multiple faces detected! Please upload an image with only your face."
+
+    # Extract the first detected face
     x, y, w, h = faces[0]
     face = img[y:y+h, x:x+w]
-    return Image.fromarray(face), None
 
-# ===================== 📌 FUNCTION: Verify Faces =====================
-def verify_faces(img1_path, img2_path, threshold=0.66):
+    cropped_face_path = output_name
+    cv2.imwrite(cropped_face_path, face)
+    return cropped_face_path, None
+
+# ===================== 📌 CNIC IMAGE ENHANCEMENT FUNCTION =====================
+def enhance_cnic_image(image_path, output_name="enhanced_cnic.jpg"):
+    img = cv2.imread(image_path)
+    if img is None:
+        return None, "❌ Error: CNIC Image not found!"
+
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    enhanced = cv2.equalizeHist(gray)
+    sharpened = cv2.GaussianBlur(enhanced, (0,0), 3)
+    sharpened = cv2.addWeighted(enhanced, 1.5, sharpened, -0.5, 0)
+
+    cv2.imwrite(output_name, sharpened)
+    return output_name, None
+
+# ===================== 📌 IMAGE RESIZING FUNCTION (FOR DeepFace) =====================
+def resize_image(image_path, output_name="resized.jpg"):
+    img = Image.open(image_path)
+    img = img.resize((250, 250))  # Resize to 250x250 for better DeepFace processing
+    img.save(output_name)
+    return output_name
+
+# ===================== 📌 FACE VERIFICATION FUNCTION =====================
+def verify_faces(img1_path, img2_path, model_name="ArcFace", detector_backend="mtcnn", threshold=0.66):
     try:
-        result = DeepFace.verify(img1_path, img2_path, model_name="ArcFace", detector_backend="opencv")
-        distance = result["distance"]
-        result["verified"] = distance <= threshold
+        if not os.path.exists(img1_path) or not os.path.exists(img2_path):
+            return None, "⚠️ One or both processed images are missing. Verification cannot proceed."
+
+        # Resize images before verification
+        img1_path = resize_image(img1_path, "resized_profile.jpg")
+        img2_path = resize_image(img2_path, "resized_cnic.jpg")
+
+        # Perform DeepFace verification
+        result = DeepFace.verify(img1_path, img2_path, model_name=model_name, detector_backend=detector_backend)
+
+        # Apply custom threshold
+        result["verified"] = result["distance"] <= threshold
         result["threshold"] = threshold
-        result["similarity_score"] = round((1 - distance) * 100, 2)
+
         return result, None
     except Exception as e:
         return None, f"❌ Error during verification: {str(e)}"
 
 # ===================== 📌 STREAMLIT UI =====================
-st.title("🔍 XenFace - Document Verification System")
-st.write("Upload your **CNIC image** and **profile picture** to verify identity.")
+st.title("🔍 CNIC Face Verification System")
+st.write("Upload your **CNIC image** and **profile picture**, and we'll check if they match!")
 
-# 📌 Sidebar Settings
-st.sidebar.header("Settings")
-enable_cnic_crop = st.sidebar.checkbox("Enable CNIC Face Cropping", value=True)
-
-# 📌 File Uploaders
 col1, col2 = st.columns(2)
+
 with col1:
-    cnic_file = st.file_uploader("📄 Upload CNIC Image", type=["jpg", "png", "jpeg"])
+    cnic_file = st.file_uploader("📤 Upload CNIC Image", type=["jpg", "png", "jpeg"])
 with col2:
-    profile_file = st.file_uploader("📄 Upload Profile Image", type=["jpg", "png", "jpeg"])
+    profile_file = st.file_uploader("📤 Upload Profile Image", type=["jpg", "png", "jpeg"])
 
 if cnic_file and profile_file:
-    cnic_image = Image.open(cnic_file).convert("RGB")
-    profile_image = Image.open(profile_file).convert("RGB")
+    # Save uploaded images
+    cnic_path = "uploaded_cnic.jpg"
+    profile_path = "uploaded_profile.jpg"
 
-    with st.spinner("Processing images..."):
-        is_valid_cnic, cnic_error = is_cnic_image(cnic_image)
-        is_valid_profile, profile_error = is_cnic_image(profile_image)
+    with open(cnic_path, "wb") as f:
+        f.write(cnic_file.getbuffer())
 
-        if not is_valid_cnic:
-            st.error(cnic_error)
-        elif is_valid_profile:
-            st.error("❌ Profile picture cannot be a CNIC image! Upload a real profile photo.")
+    with open(profile_path, "wb") as f:
+        f.write(profile_file.getbuffer())
+
+    # Extract Faces from CNIC & Profile Images
+    cnic_face_path, cnic_error = extract_face(cnic_path, "cnic_face.jpg")
+    profile_face_path, profile_error = extract_face(profile_path, "profile_face.jpg")
+
+    if cnic_error:
+        st.error(cnic_error)
+        if "Multiple faces detected" in cnic_error:
+            st.image("multiple_faces_detected.jpg", caption="Detected Multiple Faces", use_column_width=True)
+    elif profile_error:
+        st.error(profile_error)
+        if "Multiple faces detected" in profile_error:
+            st.image("multiple_faces_detected.jpg", caption="Detected Multiple Faces", use_column_width=True)
+    else:
+        # Enhance CNIC image ONLY (Not the Profile Image)
+        enhanced_cnic_path, cnic_enhance_error = enhance_cnic_image(cnic_face_path, "enhanced_cnic.jpg")
+
+        if cnic_enhance_error:
+            st.error(cnic_enhance_error)
         else:
-            cnic_face, cnic_error = extract_face(cnic_image) if enable_cnic_crop else (cnic_image, None)
-            profile_face, profile_error = extract_face(profile_image)
+            # Show processed faces
+            st.subheader("📷 Processed Face Images")
+            col1, col2 = st.columns(2)
 
-            if cnic_error:
-                st.error(cnic_error)
-            elif profile_error:
-                st.error(profile_error)
+            with col1:
+                st.image(Image.open(profile_face_path), caption="Extracted Profile Face", use_column_width=True)
+            with col2:
+                st.image(Image.open(enhanced_cnic_path), caption="Enhanced CNIC Face", use_column_width=True)
+
+            # Perform Face Verification
+            result, verify_error = verify_faces(profile_face_path, enhanced_cnic_path)
+
+            if verify_error:
+                st.error(verify_error)
             else:
-                st.subheader("📷 Processed Face Images")
-                col1, col2 = st.columns(2)
-                with col1:
-                    st.image(profile_face, caption="Profile Picture", use_container_width=True)
-                with col2:
-                    st.image(cnic_face, caption="Processed CNIC Image", use_container_width=True)
-                
-                # Save processed images to temp files (preprocessing done only once)
-                temp1 = tempfile.NamedTemporaryFile(suffix=".jpg", delete=False)
-                profile_face.save(temp1.name)
-                profile_face_path = temp1.name
-                
-                temp2 = tempfile.NamedTemporaryFile(suffix=".jpg", delete=False)
-                cnic_face.save(temp2.name)
-                cnic_face_path = temp2.name
-                
-                with st.form(key="verify_form"):
-                    submit = st.form_submit_button("🔍 Start Verification")
-                    if submit:
-                        with st.spinner("Verifying faces..."):
-                            result, verify_error = verify_faces(profile_face_path, cnic_face_path)
-                        
-                        if verify_error:
-                            st.error(verify_error)
-                        else:
-                            st.subheader("✅ Verification Result")
-                            st.markdown(f"### {'✅ Identity Verified! Your documents are successfully verified.' if result['verified'] else '⚠️ Identity Mismatch! Please upload your original documents.'}")
-                            st.write(f"**Similarity Score:** {result['similarity_score']}%")
+                # Display Result
+                st.subheader("✅ Verification Result")
+                distance = result["distance"]
+                threshold = result["threshold"]
+                match_status = "✔️ Match!" if result["verified"] else "❌ No Match!"
+
+                st.write(f"**Distance:** {distance:.4f}")
+                st.write(f"**Threshold:** {threshold:.4f}")
+                st.markdown(f"### {match_status}")
+
+else:
+    st.warning("⚠️ Please upload both images to proceed!")   kindly summarize this code
