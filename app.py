@@ -144,4 +144,4 @@ if cnic_file and profile_file:
                 st.markdown(f"### {match_status}")
 
 else:
-    st.warning("⚠️ Please upload both images to proceed!")   kindly summarize this code
+    st.warning("⚠️ Please upload both images to proceed!") 
