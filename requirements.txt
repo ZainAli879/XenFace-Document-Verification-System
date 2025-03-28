@@ -6,3 +6,4 @@ pillow
 tensorflow
 tf-keras
 easyocr
+mediapipe
