@@ -80,9 +80,9 @@ st.write("Upload your **CNIC image** and **profile picture**, and we'll check if
 col1, col2 = st.columns(2)
 
 with col1:
-    cnic_file = st.file_uploader("📤 Upload CNIC Image", type=["jpg", "png", "jpeg"])
+    cnic_file = st.file_uploader("📤 Upload CNIC Image With Good Quality", type=["jpg", "png", "jpeg"])
 with col2:
-    profile_file = st.file_uploader("📤 Upload Profile Image", type=["jpg", "png", "jpeg"])
+    profile_file = st.file_uploader("📤 Upload Profile Image ", type=["jpg", "png", "jpeg"])
 
 if cnic_file and profile_file:
     cnic_path = "uploaded_cnic.jpg"
@@ -95,7 +95,7 @@ if cnic_file and profile_file:
 
     # Validate CNIC Image
     if not is_valid_cnic(cnic_path):
-        st.error("❌ Invalid CNIC image! Please upload a valid CNIC with recognizable government logos and text.")
+        st.error("❌ Invalid CNIC image! Please upload a valid CNIC Image with Good Quality.")
     else:
         # Extract Faces with unique names
         cnic_face_path, cnic_error = extract_face(cnic_path, "cnic_face.jpg")
@@ -124,7 +124,7 @@ if cnic_file and profile_file:
                 st.subheader("✅ Verification Result")
                 distance = result["distance"]
                 threshold = result["threshold"]
-                match_status = "✔️ Match!" if result["verified"] else "❌ No Match!"
+                match_status = "✔️ Congrats Your Documents are Verified!" if result["verified"] else "❌ No Match! Please Upload Your Original Documents"
                 
                 st.write(f"**Distance:** {distance:.4f}")
                 st.write(f"**Threshold:** {threshold:.4f}")
