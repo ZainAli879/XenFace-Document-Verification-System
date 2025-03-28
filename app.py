@@ -110,9 +110,9 @@ if cnic_file and profile_file:
             st.subheader("📷 Processed Face Images")
             col1, col2 = st.columns(2)
             with col1:
-                st.image(Image.open(profile_face_path), caption="Extracted Profile Face", use_column_width=True)
+                st.image(Image.open(profile_face_path), caption="Extracted Profile Face", use_container_width=True)
             with col2:
-                st.image(Image.open(cnic_face_path), caption="Extracted CNIC Face", use_column_width=True)
+                st.image(Image.open(cnic_face_path), caption="Extracted CNIC Face", use_container_width=True)
             
             # Perform Face Verification
             result, verify_error = verify_faces(profile_face_path, cnic_face_path)
