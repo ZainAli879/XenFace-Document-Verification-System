@@ -6,6 +6,7 @@ import re
 from deepface import DeepFace
 from PIL import Image
 from io import BytesIO
+import tempfile
 
 # ===================== 📌 CONFIGURE STREAMLIT =====================
 st.set_page_config(page_title="XenFace - Document Verification", page_icon="🔍", layout="wide")
@@ -50,7 +51,15 @@ def extract_face(image):
 # ===================== 📌 FUNCTION: Verify Faces =====================
 def verify_faces(img1, img2, threshold=0.66):
     try:
-        result = DeepFace.verify(img1, img2, model_name="ArcFace", detector_backend="opencv")
+        with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as temp1:
+            img1.save(temp1.name)
+            img1_path = temp1.name
+        
+        with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as temp2:
+            img2.save(temp2.name)
+            img2_path = temp2.name
+
+        result = DeepFace.verify(img1_path, img2_path, model_name="ArcFace", detector_backend="opencv")
         distance = result["distance"]
         result["verified"] = distance <= threshold
         result["threshold"] = threshold
@@ -109,7 +118,7 @@ if cnic_file and profile_file:
                     submit = st.form_submit_button("🔍 Start Verification")
                     if submit:
                         with st.spinner("Verifying faces..."):
-                            result, verify_error = verify_faces(profile_image, cnic_image)
+                            result, verify_error = verify_faces(profile_face, cnic_image)
                         
                         if verify_error:
                             st.error(verify_error)
